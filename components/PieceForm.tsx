@@ -130,7 +130,7 @@ export default function PieceForm() {
         setUploadingStage("");
 
         try {
-            // ─── 1. Subir imágenes a Cloudflare a través de nuestra API ───
+            // ─── 1. Subir imágenes directamente a Cloudflare (Client-side) ───
             const imageUrls: string[] = [];
 
             if (selectedFiles.length > 0) {
@@ -141,18 +141,31 @@ export default function PieceForm() {
                     const formData = new FormData();
                     formData.append("file", file);
 
-                    const uploadRes = await fetch("/api/upload-image", {
-                        method: "POST",
-                        body: formData,
-                    });
+                    // Client-side direct upload using Cloudflare Images URL
+                    // Note: Exposing API Token client-side is INSECURE and only done here
+                    // as an emergency workaround for pure static GitHub Pages deployment.
+                    const cfRes = await fetch(
+                        `https://api.cloudflare.com/client/v4/accounts/${process.env.NEXT_PUBLIC_CF_ACCOUNT_ID}/images/v1`,
+                        {
+                            method: "POST",
+                            headers: {
+                                "Authorization": `Bearer ${process.env.NEXT_PUBLIC_CF_API_TOKEN}`,
+                            },
+                            body: formData,
+                        }
+                    );
 
-                    const uploadData = await uploadRes.json();
+                    const cfData = await cfRes.json() as { success: boolean; result?: { id: string }, errors?: { message: string }[] };
 
-                    if (!uploadData.success) {
-                        throw new Error(`Error en imagen ${i + 1}: ${uploadData.error}`);
+                    if (!cfRes.ok || !cfData.success) {
+                        throw new Error(`Error en imagen ${i + 1}: ${cfData.errors?.[0]?.message || 'Error desconocido'}`);
                     }
 
-                    imageUrls.push(uploadData.url); // Guardar URL pública devuelta por Cloudflare
+                    const deliveryBase =
+                        process.env.NEXT_PUBLIC_CF_IMAGE_DELIVERY ||
+                        `https://imagedelivery.net/${process.env.NEXT_PUBLIC_CF_ACCOUNT_ID}`;
+
+                    imageUrls.push(`${deliveryBase}/${cfData.result!.id}/public`);
                 }
             }
 
