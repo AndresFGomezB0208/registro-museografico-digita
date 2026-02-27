@@ -45,6 +45,9 @@ jobs:
       - name: Build with Next.js
         run: npx next build
         
+      - name: Create .nojekyll to prevent Next.js folder ignoring
+        run: copy NUL out\.nojekyll || touch out/.nojekyll
+        
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
